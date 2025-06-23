@@ -23,7 +23,6 @@ import java.util.Map;
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    @Autowired
     private final UserService userService;
 
     @PostMapping("/register")

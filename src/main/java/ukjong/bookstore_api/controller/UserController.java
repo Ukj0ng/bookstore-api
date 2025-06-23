@@ -17,7 +17,6 @@ import ukjong.bookstore_api.service.UserService;
 @RequestMapping("/api/users")
 public class UserController {
 
-    @Autowired
     private final UserService userService;
 
     @GetMapping("/profile")
