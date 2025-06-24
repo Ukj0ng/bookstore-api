@@ -3,11 +3,13 @@ package ukjong.bookstore_api.controller;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import ukjong.bookstore_api.dto.request.BookFilterRequest;
 import ukjong.bookstore_api.dto.request.BookRequest;
 import ukjong.bookstore_api.dto.response.ApiResponse;
 import ukjong.bookstore_api.dto.response.BookListResponse;
@@ -17,9 +19,11 @@ import ukjong.bookstore_api.entity.User;
 import ukjong.bookstore_api.service.BookService;
 import ukjong.bookstore_api.service.UserService;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.util.List;
 
+@Slf4j
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/books")
@@ -195,6 +199,54 @@ public class BookController {
             @PageableDefault(size = 10) Pageable pageable
     ) {
 
+        try {
+            BookFilterRequest filter = new BookFilterRequest();
+            filter.setTitle(title);
+            filter.setAuthor(author);
+            filter.setCategoryId(categoryId);
+            filter.setSortBy(sortBy);
+            filter.setSortDirection(sortDirection);
+            filter.setInStockOnly(inStockOnly);
+
+            if (minPrice != null && !minPrice.trim().isEmpty()) {
+                filter.setMinPrice(new BigDecimal(minPrice));
+            }
+
+            if (maxPrice != null && !maxPrice.trim().isEmpty()) {
+                filter.setMaxPrice(new BigDecimal(maxPrice));
+            }
+
+            if (filter.getMinPrice() != null && filter.getMaxPrice() != null) {
+                if (filter.getMinPrice().compareTo(filter.getMaxPrice()) > 0) {
+                    return ResponseEntity.badRequest()
+                            .body(ApiResponse.error("최소 가격이 최대 가격보다 클 수 없습니다."));
+                }
+            }
+
+            if (filter.getMinPrice() != null && filter.getMinPrice().compareTo(BigDecimal.ZERO) < 0) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("가격은 0 이상이어야 합니다."));
+            }
+
+            if (filter.getMaxPrice() != null && filter.getMaxPrice().compareTo(BigDecimal.ZERO) < 0) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("가격은 0 이상이어야 합니다."));
+            }
+
+            PageResponse<BookListResponse> result = bookService.filterBooks(filter, pageable);
+
+            String message = result.getTotalElements() > 0
+                    ? String.format("%d개의 도서를 찾았습니다.", result.getTotalElements())
+                    : "조건에 맞는 도서가 없습니다.";
+
+            return ResponseEntity.ok(ApiResponse.success(message, result));
+        } catch (NumberFormatException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("가격 형식이 올바르지 않습니다."));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("필터링 중 오류가 발생했습니다."));
+        }
     }
 
     @GetMapping("/bestsellers")
