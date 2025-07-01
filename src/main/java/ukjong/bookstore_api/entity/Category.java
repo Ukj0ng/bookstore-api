@@ -3,6 +3,7 @@ package ukjong.bookstore_api.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -11,6 +12,7 @@ import java.util.List;
 
 @Data
 @Entity
+@Builder
 @Table(name = "categories")
 public class Category {
 
