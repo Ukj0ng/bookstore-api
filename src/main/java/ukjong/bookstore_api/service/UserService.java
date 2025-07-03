@@ -11,7 +11,10 @@ import ukjong.bookstore_api.dto.request.UpdateUserRequest;
 import ukjong.bookstore_api.dto.response.AuthResponse;
 import ukjong.bookstore_api.dto.response.UserResponse;
 import ukjong.bookstore_api.entity.User;
+import ukjong.bookstore_api.exception.UnauthorizedException;
+import ukjong.bookstore_api.exception.UserNotFoundException;
 import ukjong.bookstore_api.repository.UserRepository;
+import ukjong.bookstore_api.security.JwtTokenProvider;
 
 @RequiredArgsConstructor
 @Slf4j
@@ -20,6 +23,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final PasswordEncoder encoder;
+    private final JwtTokenProvider jwtTokenProvider;
 
     @Transactional
     public UserResponse registerUser(RegisterRequest request) {
@@ -33,16 +37,67 @@ public class UserService {
     }
 
     public AuthResponse loginUser(LoginRequest request) {
-        User user = userRepository.findByUsername(request.getUsername())
-                .orElseThrow(() -> new RuntimeException("사용자를 찾을 수 없습니다."));
+        try {
+            User user = userRepository.findByUsername(request.getUsername())
+                    .orElseThrow(() -> new UnauthorizedException("사용자를 찾을 수 없습니다."));
 
-        if (!encoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("비밀번호가 일치하지 않습니다");
+            if (!encoder.matches(request.getPassword(), user.getPassword())) {
+                throw new UnauthorizedException("비밀번호가 일치하지 않습니다.");
+            }
+
+            String accessToken = jwtTokenProvider.createAccessToken(user);
+            String refreshToken = jwtTokenProvider.createRefreshToken(user);
+
+            log.info("사용자 로그인 성공 - ID: {}, Username: {}", user.getId(), user.getUsername());
+
+            return AuthResponse.builder()
+                    .accessToken(accessToken)
+                    .refreshToken(refreshToken)
+                    .tokenType("Bearer")
+                    .user(new UserResponse(user))
+                    .build();
+
+        } catch (UnauthorizedException e) {
+            log.warn("로그인 실패 - Username: {}, Reason: {}", request.getUsername(), e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("로그인 처리 중 오류 발생 - Username: {}", request.getUsername(), e);
+            throw new RuntimeException("로그인 처리 중 오류가 발생했습니다.", e);
         }
+    }
 
-        String token = "temporary-jwt-token";
+    public AuthResponse refreshToken(String refreshToken) {
+        try {
+            if (!jwtTokenProvider.validateToken(refreshToken)) {
+                throw new UnauthorizedException("유효하지 않은 리프레시 토큰입니다.");
+            }
 
-        return new AuthResponse(token, "Bearer", new UserResponse(user));
+            if (!jwtTokenProvider.isRefreshToken(refreshToken)) {
+                throw new UnauthorizedException("리프레시 토큰이 아닙니다.");
+            }
+
+            Long userId = jwtTokenProvider.getUserIdFromToken(refreshToken);
+            User user = findById(userId);
+
+            String newAccessToken = jwtTokenProvider.createAccessToken(user);
+            String newRefreshToken = jwtTokenProvider.createRefreshToken(user);
+
+            log.info("토큰 재발급 완료 - UserId: {}, Username: {}", user.getId(), user.getUsername());
+
+            return AuthResponse.builder()
+                    .accessToken(newAccessToken)
+                    .refreshToken(newRefreshToken)
+                    .tokenType("Bearer")
+                    .user(new UserResponse(user))
+                    .build();
+
+        } catch (UnauthorizedException e) {
+            log.warn("토큰 재발급 실패: {}", e.getMessage());
+            throw e;
+        } catch (Exception e) {
+            log.error("토큰 재발급 중 오류 발생", e);
+            throw new RuntimeException("토큰 재발급 중 오류가 발생했습니다.", e);
+        }
     }
 
     public UserResponse getUserProfile(Long userId) {
@@ -69,6 +124,24 @@ public class UserService {
 
         User updatedUser = userRepository.save(user);
         return new UserResponse(updatedUser);
+    }
+
+    public boolean isValidUser(Long userId) {
+        try {
+            findById(userId);
+            return true;
+        } catch (UserNotFoundException e) {
+            return false;
+        }
+    }
+
+    public boolean hasAdminRole(Long userId) {
+        try {
+            User user = findById(userId);
+            return user.getRole() == User.Role.ADMIN;
+        } catch (UserNotFoundException e) {
+            return false;
+        }
     }
 
     public boolean existsByUsername(String username) {
