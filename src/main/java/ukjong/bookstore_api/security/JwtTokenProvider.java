@@ -1,8 +1,6 @@
 package ukjong.bookstore_api.security;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import lombok.extern.slf4j.Slf4j;
@@ -42,6 +40,19 @@ public class JwtTokenProvider {
                 .claim("email", user.getEmail())
                 .claim("role", user.getRole().name())
                 .claim("type", "ACCESS")
+                .setIssuedAt(now)
+                .setExpiration(validity)
+                .signWith(secretKey, SignatureAlgorithm.HS256)
+                .compact();
+    }
+
+    public String createRefreshToken(User user) {
+        Date now = new Date();
+        Date validity = new Date(now.getTime() + refreshTokenValidityInMilliseconds);
+
+        return Jwts.builder()
+                .setSubject(user.getId().toString())
+                .claim("type", "REFRESH")
                 .setIssuedAt(now)
                 .setExpiration(validity)
                 .signWith(secretKey, SignatureAlgorithm.HS256)
