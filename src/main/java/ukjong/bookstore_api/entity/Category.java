@@ -3,8 +3,10 @@ package ukjong.bookstore_api.entity;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -14,6 +16,8 @@ import java.util.List;
 @Entity
 @Builder
 @Table(name = "categories")
+@NoArgsConstructor
+@AllArgsConstructor
 public class Category {
 
     @Id
@@ -36,19 +40,8 @@ public class Category {
 
     // 연관관계 - 카테고리에 속한 도서들
     @OneToMany(mappedBy = "category", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @Builder.Default
     private List<Book> books = new ArrayList<>();
-
-    // 기본 생성자
-    public Category() {
-        this.createdAt = LocalDateTime.now();
-    }
-
-    // 생성자
-    public Category(String name, String description) {
-        this();
-        this.name = name;
-        this.description = description;
-    }
 
     // PreUpdate 콜백
     @PreUpdate
