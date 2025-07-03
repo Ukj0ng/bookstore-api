@@ -1,14 +1,14 @@
 package ukjong.bookstore_api.dto.response;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
-@Data
+@Getter
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class AuthResponse {
-    private String token;
-    private String tokenType = "Bearer";
+    private String accessToken;
+    private String refreshToken;
+    private String tokenType;
     private UserResponse user;
 }
