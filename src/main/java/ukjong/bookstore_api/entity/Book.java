@@ -2,8 +2,10 @@ package ukjong.bookstore_api.entity;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -13,6 +15,8 @@ import java.time.LocalDateTime;
 @Entity
 @Builder
 @Table(name = "books")
+@NoArgsConstructor
+@AllArgsConstructor
 public class Book {
 
     @Id
@@ -41,6 +45,7 @@ public class Book {
     private BigDecimal price;
 
     @Min(value = 0, message = "재고는 0 이상이어야 합니다")
+    @Builder.Default
     private Integer stock = 0;
 
     @Column(name = "publication_date")
@@ -67,19 +72,6 @@ public class Book {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "category_id")
     private Category category;
-
-    // 기본 생성자
-    public Book() {
-        this.createdAt = LocalDateTime.now();
-    }
-
-    // 생성자
-    public Book(String title, String author, String isbn) {
-        this();
-        this.title = title;
-        this.author = author;
-        this.isbn = isbn;
-    }
 
     // PreUpdate 콜백
     @PreUpdate

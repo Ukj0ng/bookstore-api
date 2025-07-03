@@ -4,8 +4,7 @@ import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -18,6 +17,9 @@ import java.util.List;
 @Entity
 @Builder
 @Table(name = "users")
+@ToString(exclude = {"password"})
+@NoArgsConstructor
+@AllArgsConstructor
 public class User implements UserDetails {
 
     @Id
@@ -41,6 +43,7 @@ public class User implements UserDetails {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
+    @Builder.Default
     private Role role = Role.USER;
 
     @Column(name = "created_at", nullable = false)
@@ -48,19 +51,6 @@ public class User implements UserDetails {
 
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
-
-    // 기본 생성자
-    public User() {
-        this.createdAt = LocalDateTime.now();
-    }
-
-    // 생성자
-    public User(String username, String email, String password) {
-        this();
-        this.username = username;
-        this.email = email;
-        this.password = password;
-    }
 
     // PreUpdate 콜백
     @PreUpdate
