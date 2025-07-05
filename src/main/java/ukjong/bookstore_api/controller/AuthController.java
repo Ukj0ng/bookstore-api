@@ -2,8 +2,11 @@ package ukjong.bookstore_api.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import ukjong.bookstore_api.dto.request.LoginRequest;
 import ukjong.bookstore_api.dto.request.RegisterRequest;
@@ -11,18 +14,17 @@ import ukjong.bookstore_api.dto.response.ApiResponse;
 import ukjong.bookstore_api.dto.response.AuthResponse;
 import ukjong.bookstore_api.dto.response.UserResponse;
 import ukjong.bookstore_api.exception.UnauthorizedException;
-import ukjong.bookstore_api.security.JwtTokenProvider;
 import ukjong.bookstore_api.service.UserService;
 
 import java.util.Map;
 
 @RequiredArgsConstructor
 @RestController
+@Slf4j
 @RequestMapping("/api/auth")
 public class AuthController {
 
     private final UserService userService;
-    private final JwtTokenProvider jwtTokenProvider;
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<UserResponse>> register(
@@ -45,12 +47,19 @@ public class AuthController {
     public ResponseEntity<ApiResponse<AuthResponse>> login(
             @Valid @RequestBody LoginRequest request) {
         try {
+            log.info("🚀 로그인 컨트롤러 시작 - Username: {}", request.getUsername());
             AuthResponse authResponse = userService.loginUser(request);
+            log.info("📤 AuthResponse 생성 완료, 응답 준비 중...");
 
             return ResponseEntity.ok(ApiResponse.success("로그인에 성공했습니다.", authResponse));
-        } catch (Exception e) {
+        } catch (UnauthorizedException e) {
+            log.warn("로그인 실패 - Username: {}, Reason: {}", request.getUsername(), e.getMessage());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            log.error("로그인 처리 중 오류 발생 - Username: {}", request.getUsername(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("로그인 처리 중 오류가 발생했습니다."));
         }
     }
 
@@ -82,13 +91,13 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(
             @RequestHeader(value = "Authorization", required = false) String authorization) {
         try {
-            // 실제로는 토큰을 블랙리스트에 추가하거나 Redis에서 제거하는 로직이 필요
-            // 현재는 클라이언트에서 토큰을 제거하도록 안내
-
-            String token = jwtTokenProvider.resolveToken(authorization);
-            if (token != null) {
+            // 현재 인증된 사용자 정보 가져오기 (Spring Security에서 제공)
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated()) {
+                Long userId = (Long) auth.getPrincipal();
+                log.info("로그아웃 요청 - UserId: {}", userId);
                 // 향후 토큰 블랙리스트 기능 구현 시 사용
-                // tokenBlacklistService.addToBlacklist(token);
+                // tokenBlacklistService.addToBlacklist(userId);
             }
 
             return ResponseEntity.ok(ApiResponse.success("로그아웃되었습니다.", null));
@@ -137,38 +146,23 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.success(message, available));
     }
 
-    @GetMapping("/validate")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> validateToken(
-            @RequestHeader("Authorization") String authorization
-    ) {
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UserResponse>> getCurrentUser() {
         try {
-            String token = jwtTokenProvider.resolveToken(authorization);
-
-            if (token == null) {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !auth.isAuthenticated()) {
                 return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error("토큰이 없습니다."));
+                        .body(ApiResponse.error("인증이 필요합니다."));
             }
 
-            if (!jwtTokenProvider.validateToken(token)) {
-                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                        .body(ApiResponse.error("유효하지 않은 토큰입니다."));
-            }
+            Long userId = (Long) auth.getPrincipal();
+            UserResponse userResponse = userService.getUserProfile(userId);
 
-            Long userId = jwtTokenProvider.getUserIdFromToken(token);
-            String username = jwtTokenProvider.getUsernameFromToken(token);
-            String role = jwtTokenProvider.getRoleFromToken(token);
-
-            Map<String, Object> tokenInfo = Map.of(
-                    "userId", userId,
-                    "username", username,
-                    "role", role,
-                    "valid", true);
-
-            return ResponseEntity.status(HttpStatus.OK)
-                    .body(ApiResponse.error("토큰 검증 중 오류가 발생했습니다."));
+            return ResponseEntity.ok(ApiResponse.success("사용자 정보 조회 완료", userResponse));
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("토큰 검증 중 오류가 발생했습니다."));
+            log.error("사용자 정보 조회 중 오류 발생", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("사용자 정보 조회 중 오류가 발생했습니다."));
         }
     }
 }
