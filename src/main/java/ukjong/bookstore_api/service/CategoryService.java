@@ -9,6 +9,7 @@ import ukjong.bookstore_api.dto.response.CategoryResponse;
 import ukjong.bookstore_api.entity.Category;
 import ukjong.bookstore_api.repository.CategoryRepository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -192,9 +193,13 @@ public class CategoryService {
     }
 
     private Category createCategoryFromRequest(CategoryRequest request) {
+        LocalDateTime now = LocalDateTime.now();
+
         return Category.builder()
                 .name(request.getName())
                 .description(request.getDescription())
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
     }
 }

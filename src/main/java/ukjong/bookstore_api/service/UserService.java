@@ -16,6 +16,8 @@ import ukjong.bookstore_api.exception.UserNotFoundException;
 import ukjong.bookstore_api.repository.UserRepository;
 import ukjong.bookstore_api.security.JwtTokenProvider;
 
+import java.time.LocalDateTime;
+
 @RequiredArgsConstructor
 @Slf4j
 @Service
@@ -45,8 +47,11 @@ public class UserService {
                 throw new UnauthorizedException("비밀번호가 일치하지 않습니다.");
             }
 
+            log.info("🎫 토큰 생성 시작...");
             String accessToken = jwtTokenProvider.createAccessToken(user);
+            log.info("✅ Access Token 생성 완료 - 길이: {}", accessToken.length());
             String refreshToken = jwtTokenProvider.createRefreshToken(user);
+            log.info("✅ Refresh Token 생성 완료 - 길이: {}", refreshToken.length());
 
             log.info("사용자 로그인 성공 - ID: {}, Username: {}", user.getId(), user.getUsername());
 
@@ -167,11 +172,15 @@ public class UserService {
     }
 
     private User createUserFromRequest(RegisterRequest request) {
+        LocalDateTime now = LocalDateTime.now();
+
         return User.builder()
                 .username(request.getUsername())
                 .email(request.getEmail())
                 .password(encoder.encode(request.getPassword()))
                 .role(User.Role.USER)
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
     }
 }

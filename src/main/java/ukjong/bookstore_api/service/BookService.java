@@ -24,6 +24,7 @@ import ukjong.bookstore_api.repository.BookRepository;
 import ukjong.bookstore_api.validator.BookValidator;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -494,6 +495,8 @@ public class BookService {
     // ========== 헬퍼 메서드들 ==========
 
     private Book createBookFromRequest(BookRequest request, Category category) {
+        LocalDateTime now = LocalDateTime.now();
+
         return Book.builder()
                 .title(request.getTitle().trim())
                 .author(request.getAuthor().trim())
@@ -505,6 +508,8 @@ public class BookService {
                 .publisher(request.getPublisher() != null ? request.getPublisher().trim() : null)
                 .pageCount(request.getPageCount())
                 .category(category)
+                .createdAt(now)
+                .updatedAt(now)
                 .build();
     }
 
