@@ -4,31 +4,31 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
-import ukjong.bookstore_api.interceptor.JwtAuthInterceptor;
+import ukjong.bookstore_api.interceptor.RequestLoggingInterceptor;
+import ukjong.bookstore_api.interceptor.UserValidationInterceptor;
 
 @Configuration
 @RequiredArgsConstructor
 public class WebConfig implements WebMvcConfigurer {
 
-    private final JwtAuthInterceptor jwtAuthInterceptor;
+    private final RequestLoggingInterceptor requestLoggingInterceptor;
+    private final UserValidationInterceptor userValidationInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(jwtAuthInterceptor)
+        // 1. 요청 로깅 인터셉터 (모든 API 요청)
+        registry.addInterceptor(requestLoggingInterceptor)
+                .addPathPatterns("/api/**")
+                .order(1);
+
+        // 2. 사용자 검증 인터셉터 (인증이 필요한 API만)
+        registry.addInterceptor(userValidationInterceptor)
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
-                        // 인증이 필요 없는 경로들 (인터셉터에서도 처리하지만 성능상 제외)
-                        "/api/auth/register",
-                        "/api/auth/login",
-                        "/api/auth/check-username",
-                        "/api/auth/check-email",
-                        "/api/auth/refresh",  // 토큰 재발급
-
-                        // 정적 리소스 및 문서
-                        "/swagger-ui/**",
-                        "/v3/api-docs/**",
-                        "/health",
-                        "/actuator/**"
-                );
+                        "/api/auth/**",
+                        "/api/books/**",      // GET 요청은 Spring Security에서 허용
+                        "/api/categories/**"  // GET 요청은 Spring Security에서 허용
+                )
+                .order(2);
     }
 }
