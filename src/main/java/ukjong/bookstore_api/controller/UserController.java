@@ -1,17 +1,18 @@
 package ukjong.bookstore_api.controller;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import ukjong.bookstore_api.dto.request.UpdateUserRequest;
 import ukjong.bookstore_api.dto.response.ApiResponse;
 import ukjong.bookstore_api.dto.response.UserResponse;
 import ukjong.bookstore_api.service.UserService;
 
+@Slf4j
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/users")
@@ -20,30 +21,26 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/profile")
-    public ResponseEntity<ApiResponse<UserResponse>> getProfile(
-            HttpServletRequest request) {
-        Long id = (Long) request.getAttribute("userId");
+    public ResponseEntity<ApiResponse<UserResponse>> getProfile() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Long userId = (Long) auth.getPrincipal();
 
-        if (id == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("인증이 필요합니다."));
-        }
-        UserResponse profile = userService.getUserProfile(id);
-        return ResponseEntity.ok(ApiResponse.success(profile));
+        log.info("프로필 조회 요청 - UserId: {}", userId);
+
+        UserResponse profile = userService.getUserProfile(userId);
+        return ResponseEntity.ok(ApiResponse.success("프로필 조회 완료", profile));
     }
 
     @PutMapping("/profile")
     public ResponseEntity<ApiResponse<UserResponse>> updateProfile(
-            @Valid @RequestBody UpdateUserRequest request,
-            HttpServletRequest httpRequest
+            @Valid @RequestBody UpdateUserRequest request
             ) {
-        Long id = (Long) httpRequest.getAttribute("userId");
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        Long userId = (Long) auth.getPrincipal();
 
-        if (id == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("인증이 필요합니다."));
-        }
-        UserResponse updateUserProfile = userService.updateUserProfile(id, request);
-        return ResponseEntity.ok(ApiResponse.success(updateUserProfile));
+        log.info("프로필 수정 요청 - UserId: {}", userId);
+
+        UserResponse updatedProfile = userService.updateUserProfile(userId, request);
+        return ResponseEntity.ok(ApiResponse.success("프로필 수정 완료", updatedProfile));
     }
 }
