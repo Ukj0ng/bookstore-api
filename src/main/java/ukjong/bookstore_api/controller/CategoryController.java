@@ -1,28 +1,27 @@
 package ukjong.bookstore_api.controller;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import ukjong.bookstore_api.dto.request.CategoryRequest;
 import ukjong.bookstore_api.dto.response.ApiResponse;
 import ukjong.bookstore_api.dto.response.CategoryResponse;
-import ukjong.bookstore_api.entity.User;
-import ukjong.bookstore_api.exception.ForbiddenException;
-import ukjong.bookstore_api.exception.UnauthorizedException;
 import ukjong.bookstore_api.service.CategoryService;
-import ukjong.bookstore_api.service.UserService;
 
 import java.util.List;
 
+@Slf4j
 @RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/categories")
 public class CategoryController {
 
-    private final UserService userService;
     private final CategoryService categoryService;
 
     @GetMapping
@@ -44,87 +43,60 @@ public class CategoryController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> createCategory(
-            @Valid @RequestBody CategoryRequest request,
-            HttpServletRequest httpRequest) {
-
-        Long userId = (Long) httpRequest.getAttribute("userId");
-
-        if (userId == null) {
-            throw new UnauthorizedException("인증이 필요합니다.");
-        }
-
+            @Valid @RequestBody CategoryRequest request) {
         try {
-            User user = userService.findById(userId);
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Long userId = (Long) auth.getPrincipal();
 
-            if (user.getRole() != User.Role.ADMIN) {
-                throw new ForbiddenException("관리자 권한이 필요합니다.");
-            }
+            log.info("카테고리 생성 요청 - UserId: {}, Name: {}", userId, request.getName());
 
             CategoryResponse response = categoryService.createCategory(request);
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(ApiResponse.success("카테고리가 생성되었습니다.", response));
-        } catch (UnauthorizedException | ForbiddenException e) {
-            throw e; // GlobalExceptionHandler에서 처리
         } catch (Exception e) {
+            log.error("카테고리 생성 중 오류 발생", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("카테고리 생성 중 오류가 발생했습니다."));
         }
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<CategoryResponse>> updateCategory(
             @PathVariable Long id,
-            @Valid @RequestBody CategoryRequest request,
-            HttpServletRequest httpRequest) {
-
-        Long userId = (Long) httpRequest.getAttribute("userId");
-
-        if (userId == null) {
-            throw new UnauthorizedException("인증이 필요합니다.");
-        }
-
+            @Valid @RequestBody CategoryRequest request) {
         try {
-            User user = userService.findById(userId);
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Long userId = (Long) auth.getPrincipal();
 
-            if (user.getRole() != User.Role.ADMIN) {
-                throw new ForbiddenException("관리자 권한이 필요합니다.");
-            }
+            log.info("카테고리 수정 요청 - UserId: {}, CategoryId: {}", userId, id);
 
             CategoryResponse response = categoryService.updateCategory(id, request);
             return ResponseEntity.ok(ApiResponse.success("카테고리가 수정되었습니다.", response));
-        } catch (UnauthorizedException | ForbiddenException e) {
-            throw e; // GlobalExceptionHandler에서 처리
         } catch (Exception e) {
+            log.error("카테고리 수정 중 오류 발생", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("카테고리 수정 중 오류가 발생했습니다."));
         }
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteCategory(
-            @PathVariable Long id,
-            HttpServletRequest httpRequest) {
-
-        Long userId = (Long) httpRequest.getAttribute("userId");
-
-        if (userId == null) {
-            throw new UnauthorizedException("인증이 필요합니다.");
-        }
-
+            @PathVariable Long id) {
         try {
-            User user = userService.findById(userId);
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Long userId = (Long) auth.getPrincipal();
 
-            if (user.getRole() != User.Role.ADMIN) {
-                throw new ForbiddenException("관리자 권한이 필요합니다.");
-            }
+            log.info("카테고리 삭제 요청 - UserId: {}, CategoryId: {}", userId, id);
 
             categoryService.deleteCategory(id);
 
             return ResponseEntity.ok(ApiResponse.success("카테고리 삭제가 완료되었습니다.", null));
-        } catch (UnauthorizedException | ForbiddenException e) {
-            throw e; // GlobalExceptionHandler에서 처리
         } catch (Exception e) {
+            log.error("카테고리 삭제 중 오류 발생", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("카테고리 삭제 중 오류가 발생했습니다."));
         }
