@@ -1,6 +1,5 @@
 package ukjong.bookstore_api.controller;
 
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -8,6 +7,9 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import ukjong.bookstore_api.dto.request.BookFilterRequest;
 import ukjong.bookstore_api.dto.request.BookRequest;
@@ -15,9 +17,7 @@ import ukjong.bookstore_api.dto.response.ApiResponse;
 import ukjong.bookstore_api.dto.response.BookListResponse;
 import ukjong.bookstore_api.dto.response.BookResponse;
 import ukjong.bookstore_api.dto.response.PageResponse;
-import ukjong.bookstore_api.entity.User;
 import ukjong.bookstore_api.service.BookService;
-import ukjong.bookstore_api.service.UserService;
 
 import java.math.BigDecimal;
 import java.net.URI;
@@ -30,7 +30,6 @@ import java.util.List;
 public class BookController {
 
     private final BookService bookService;
-    private final UserService userService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<BookListResponse>>> getAllBooks(
@@ -59,89 +58,62 @@ public class BookController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<BookResponse>> createBook(
-            @Valid @RequestBody BookRequest request,
-            HttpServletRequest httpRequest
-            ) {
-        Long userId = (Long) httpRequest.getAttribute("userId");
-
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("인증이 필요합니다."));
-        }
-
+            @Valid @RequestBody BookRequest request) {
         try {
-            User user = userService.findById(userId);
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Long userId = (Long) auth.getPrincipal();
 
-            if (user.getRole() != User.Role.ADMIN) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(ApiResponse.error("관리자 권한이 필요합니다."));
-            }
+            log.info("도서 생성 요청 - UserId: {}, Title: {}", userId, request.getTitle());
 
             BookResponse createResult = bookService.createBook(request);
 
             return ResponseEntity.created(URI.create("/api/books/" + createResult.getId()))
                     .body(ApiResponse.success("도서가 등록되었습니다.", createResult));
         } catch (Exception e) {
+            log.error("도서 생성 중 오류 발생", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("서버 오류가 발생했습니다."));
         }
     }
 
     @PutMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<BookResponse>> updateBook(
             @PathVariable Long id,
-            @Valid @RequestBody BookRequest request,
-            HttpServletRequest httpRequest
-    ) {
-        Long userId = (Long) httpRequest.getAttribute("userId");
-
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("인증이 필요합니다."));
-        }
-
+            @Valid @RequestBody BookRequest request) {
         try {
-            User user = userService.findById(userId);
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Long userId = (Long) auth.getPrincipal();
 
-            if (user.getRole() != User.Role.ADMIN) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(ApiResponse.error("관리자 권한이 필요합니다."));
-            }
+            log.info("도서 수정 요청 - UserId: {}, BookId: {}", userId, id);
 
             BookResponse updateResult = bookService.updateBook(id, request);
 
             return ResponseEntity.ok(ApiResponse.success("도서가 수정되었습니다.", updateResult));
         } catch (Exception e) {
+            log.error("도서 수정 중 오류 발생", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("서버 오류가 발생했습니다."));
         }
     }
 
     @DeleteMapping("/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<Void>> deleteBook(
-            @PathVariable Long id,
-            HttpServletRequest httpRequest
-    ) {
-        Long userId = (Long) httpRequest.getAttribute("userId");
-
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("인증이 필요합니다."));
-        }
-
+            @PathVariable Long id) {
         try {
-            User user = userService.findById(userId);
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Long userId = (Long) auth.getPrincipal();
 
-            if (user.getRole() != User.Role.ADMIN) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(ApiResponse.error("관리자 권한이 필요합니다."));
-            }
+            log.info("도서 삭제 요청 - UserId: {}, BookId: {}", userId, id);
 
             bookService.deleteBook(id);
 
             return ResponseEntity.ok(ApiResponse.success("도서가 삭제되었습니다.", null));
         } catch (Exception e) {
+            log.error("도서 삭제 중 오류 발생", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error("서버 오류가 발생했습니다."));
         }
@@ -274,35 +246,26 @@ public class BookController {
     }
 
     @PutMapping("/{id}/stock")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<ApiResponse<BookResponse>> updateBookStock(
             @PathVariable Long id,
-            @RequestParam("quantity") int quantity,
-            HttpServletRequest httpRequest
+            @RequestParam("quantity") int quantity
     ) {
-        Long userId = (Long) httpRequest.getAttribute("userId");
-
-        if (userId == null) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("인증이 필요합니다."));
-        }
-
         if (quantity < 0) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error("재고는 0 이상이어야 합니다."));
         }
 
         try {
-            User user = userService.findById(userId);
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            Long userId = (Long) auth.getPrincipal();
 
-            if (user.getRole() != User.Role.ADMIN) {
-                return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                        .body(ApiResponse.error("관리자 권한이 필요합니다."));
-            }
+            log.info("재고 수정 요청 - UserId: {}, BookId: {}, Quantity: {}", userId, id, quantity);
 
             BookResponse result = bookService.updateBookStock(id, quantity);
-            return ResponseEntity.status(HttpStatus.OK)
-                    .body(ApiResponse.success("재고가 변경되었습니다.", result));
+            return ResponseEntity.ok(ApiResponse.success("재고가 변경되었습니다.", result));
         } catch (Exception e) {
+            log.error("재고 수정 중 오류 발생", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(ApiResponse.error(e.getMessage()));
         }
