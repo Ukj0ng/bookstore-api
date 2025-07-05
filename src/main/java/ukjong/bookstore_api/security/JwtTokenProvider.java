@@ -162,11 +162,34 @@ public class JwtTokenProvider {
     }
 
     private Claims parseToken(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(secretKey)
-                .build()
-                .parseClaimsJwt(token)
-                .getBody();
+        try {
+            // 먼저 서명된 토큰으로 시도
+            try {
+                Claims claims = Jwts.parserBuilder()
+                        .setSigningKey(secretKey)
+                        .build()
+                        .parseClaimsJws(token)
+                        .getBody();
+
+                log.debug("✅ 서명된 토큰 파싱 성공 - Subject: {}", claims.getSubject());
+                return claims;
+            } catch (UnsupportedJwtException e) {
+                // 서명된 토큰이 아니면 서명 없는 토큰으로 시도
+                log.debug("🔄 서명 없는 토큰으로 파싱 시도...");
+
+                Claims claims = Jwts.parserBuilder()
+                        .setSigningKey(secretKey)
+                        .build()
+                        .parseClaimsJwt(token)
+                        .getBody();
+
+                log.debug("✅ 서명 없는 토큰 파싱 성공 - Subject: {}", claims.getSubject());
+                return claims;
+            }
+        } catch (Exception e) {
+            log.error("❌ 토큰 파싱 실패: {}", e.getMessage());
+            throw e;
+        }
     }
 
     public void logTokenInfo(String token) {
