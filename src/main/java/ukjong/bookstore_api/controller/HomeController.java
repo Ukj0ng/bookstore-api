@@ -10,6 +10,6 @@ public class HomeController {
 
     @GetMapping
     public String test() {
-        return "successa";
+        return "success green";
     }
 }
