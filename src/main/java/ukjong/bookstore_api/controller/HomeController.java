@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class HomeController {
 
     @GetMapping
-    public void test() {
-        System.out.println("asdf");
+    public String test() {
+        return "success";
     }
 }
